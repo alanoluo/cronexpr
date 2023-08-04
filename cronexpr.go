@@ -18,6 +18,7 @@ package cronexpr
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -67,7 +68,7 @@ func MustParse(cronLine string) *Expression {
 // about what is a well-formed cron expression from this library's point of
 // view.
 func Parse(cronLine string) (*Expression, error) {
-
+	cronLine = strings.Join(strings.Fields(cronLine), " ")
 	// Maybe one of the built-in aliases is being used
 	cron := cronNormalizer.Replace(cronLine)
 
@@ -87,7 +88,11 @@ func Parse(cronLine string) (*Expression, error) {
 
 	// second field (optional)
 	if fieldCount == 7 {
-		err = expr.secondFieldHandler(cron[indices[field][0]:indices[field][1]])
+		if cron[indices[field][0]:indices[field][1]] == "*/60" {
+			err = expr.secondFieldHandler("0")
+		} else {
+			err = expr.secondFieldHandler(cron[indices[field][0]:indices[field][1]])
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -97,14 +102,22 @@ func Parse(cronLine string) (*Expression, error) {
 	}
 
 	// minute field
-	err = expr.minuteFieldHandler(cron[indices[field][0]:indices[field][1]])
+	if cron[indices[field][0]:indices[field][1]] == "*/60" {
+		err = expr.minuteFieldHandler("0")
+	} else {
+		err = expr.minuteFieldHandler(cron[indices[field][0]:indices[field][1]])
+	}
 	if err != nil {
 		return nil, err
 	}
 	field += 1
 
 	// hour field
-	err = expr.hourFieldHandler(cron[indices[field][0]:indices[field][1]])
+	if cron[indices[field][0]:indices[field][1]] == "*/24" {
+		err = expr.hourFieldHandler("0")
+	} else {
+		err = expr.hourFieldHandler(cron[indices[field][0]:indices[field][1]])
+	}
 	if err != nil {
 		return nil, err
 	}
