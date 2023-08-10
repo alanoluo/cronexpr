@@ -181,7 +181,8 @@ var (
 /******************************************************************************/
 
 var (
-	layoutWildcard            = `^\*$|^\?$`
+	layoutWildcard            = `^\*$`
+	layoutDayWeek             = `^\?$`
 	layoutValue               = `^(%value%)$`
 	layoutRange               = `^(%value%)-(%value%)$`
 	layoutWildcardAndInterval = `^\*/(\d+)$`
@@ -267,7 +268,7 @@ type cronDirective struct {
 }
 
 func genericFieldHandler(s string, desc fieldDescriptor) ([]int, error) {
-	directives, err := genericFieldParse(s, desc)
+	directives, err := genericFieldParse(s, desc, false)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +294,7 @@ func (expr *Expression) dowFieldHandler(s string) error {
 	expr.lastWeekDaysOfWeek = make(map[int]bool)
 	expr.specificWeekDaysOfWeek = make(map[int]bool)
 
-	directives, err := genericFieldParse(s, dowDescriptor)
+	directives, err := genericFieldParse(s, dowDescriptor, true)
 	if err != nil {
 		return err
 	}
@@ -309,7 +310,7 @@ func (expr *Expression) dowFieldHandler(s string) error {
 				populateOne(expr.lastWeekDaysOfWeek, dowDescriptor.atoi(snormal[pairs[2]:pairs[3]]))
 			} else {
 				// `5#3`
-				pairs := makeLayoutRegexp(layoutDowOfSpecificWeek, dowDescriptor.valuePattern).FindStringSubmatchIndex(snormal)
+				pairs = makeLayoutRegexp(layoutDowOfSpecificWeek, dowDescriptor.valuePattern).FindStringSubmatchIndex(snormal)
 				if len(pairs) > 0 {
 					populateOne(expr.specificWeekDaysOfWeek, (dowDescriptor.atoi(snormal[pairs[4]:pairs[5]])-1)*7+(dowDescriptor.atoi(snormal[pairs[2]:pairs[3]])%7))
 				} else {
@@ -335,7 +336,7 @@ func (expr *Expression) domFieldHandler(s string) error {
 	expr.daysOfMonth = make(map[int]bool)     // days of month map
 	expr.workdaysOfMonth = make(map[int]bool) // work days of month map
 
-	directives, err := genericFieldParse(s, domDescriptor)
+	directives, err := genericFieldParse(s, domDescriptor, true)
 	if err != nil {
 		return err
 	}
@@ -399,7 +400,7 @@ func toList(set map[int]bool) []int {
 
 /******************************************************************************/
 
-func genericFieldParse(s string, desc fieldDescriptor) ([]*cronDirective, error) {
+func genericFieldParse(s string, desc fieldDescriptor, questionMark bool) ([]*cronDirective, error) {
 	// At least one entry must be present
 	indices := entryFinder.FindAllStringIndex(s, -1)
 	if len(indices) == 0 {
@@ -417,6 +418,15 @@ func genericFieldParse(s string, desc fieldDescriptor) ([]*cronDirective, error)
 
 		// `*`
 		if makeLayoutRegexp(layoutWildcard, desc.valuePattern).MatchString(snormal) {
+			directive.kind = all
+			directive.first = desc.min
+			directive.last = desc.max
+			directive.step = 1
+			directives = append(directives, &directive)
+			continue
+		}
+		// `?`
+		if questionMark && makeLayoutRegexp(layoutDayWeek, desc.valuePattern).MatchString(snormal) {
 			directive.kind = all
 			directive.first = desc.min
 			directive.last = desc.max
